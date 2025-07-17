@@ -6,7 +6,8 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "asp": "echo open your browser on http://localhost:4200/ && ng serve"
   },
   "prettier": {
     "overrides": [

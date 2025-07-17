@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using CsvHelper;
 using System.Text;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SpaServices.AngularCli;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -22,6 +23,13 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
+// Register SPA
+builder.Services.AddSpaStaticFiles(options =>
+{
+    options.RootPath = "ClientApp/dist/browser";
+});
+
+
 
 var app = builder.Build();
 
@@ -32,7 +40,14 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors(policy => policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
+
+// Enable HTTPS and static files
 app.UseHttpsRedirection();
+app.UseStaticFiles();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseSpaStaticFiles();
+}
 
 
 // Ensure DB exists and import CSV on startup
@@ -44,7 +59,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 // API Endpoints
-app.MapGet("/pizzas", (
+app.MapGet("/api/pizzas", (
     [FromQuery] string? type,
     [FromQuery] string? size,
     PizzaDbContext db) =>
@@ -55,9 +70,9 @@ app.MapGet("/pizzas", (
     return query.ToList();
 });
 
-app.MapGet("/pizza-types", (PizzaDbContext db) => db.PizzaTypes.ToList());
+app.MapGet("/api/pizza-types", (PizzaDbContext db) => db.PizzaTypes.ToList());
 
-app.MapGet("/orders", (PizzaDbContext db, DateTime? from, DateTime? to) =>
+app.MapGet("/api/orders", (PizzaDbContext db, DateTime? from, DateTime? to) =>
 {
     var query = db.Orders.AsQueryable();
     if (from.HasValue)
@@ -67,9 +82,9 @@ app.MapGet("/orders", (PizzaDbContext db, DateTime? from, DateTime? to) =>
     return query.ToList();
 });
 
-app.MapGet("/order-details", (PizzaDbContext db) => db.OrderDetails.ToList());
+app.MapGet("/api/order-details", (PizzaDbContext db) => db.OrderDetails.ToList());
 
-app.MapGet("/export/pizzas/csv", (PizzaDbContext db) =>
+app.MapGet("/api/export/pizzas/csv", (PizzaDbContext db) =>
 {
     var records = db.Pizzas.ToList();
     using var memoryStream = new MemoryStream();
@@ -80,7 +95,7 @@ app.MapGet("/export/pizzas/csv", (PizzaDbContext db) =>
     return Results.File(memoryStream.ToArray(), "text/csv", "pizzas.csv");
 });
 
-app.MapGet("/export/orders/json", (PizzaDbContext db) =>
+app.MapGet("/api/export/orders/json", (PizzaDbContext db) =>
 {
     var records = db.Orders.ToList();
     return Results.Json(records);
@@ -92,10 +107,28 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "Pizza API v1");
-        c.RoutePrefix = string.Empty; // optional: serve at root (http://localhost:xxx/)
+        c.RoutePrefix = "swagger"; 
     });
 }
 
+
+// Static + SPA handling
+app.UseWhen(
+    context => !context.Request.Path.StartsWithSegments("/api"),
+    then => then.UseSpa(spa =>
+    {
+        const int port = 4200;
+
+        spa.Options.SourcePath = "ClientApp";
+        spa.Options.DevServerPort = port;
+        spa.Options.PackageManagerCommand = "npm";
+
+        if (app.Environment.IsDevelopment())
+        {
+            spa.UseAngularCliServer("asp");
+            spa.UseProxyToSpaDevelopmentServer($"http://localhost:{port}");
+        }
+    }));
 
 app.Run();
 

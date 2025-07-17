@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
 export class PizzaService {
-  private baseUrl = 'https://localhost:7161';
+  private baseUrl = 'https://localhost:7161/api';
 
   constructor(private http: HttpClient) {}
 
